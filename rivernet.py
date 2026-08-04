@@ -339,6 +339,39 @@ def _to_float(value: Any) -> Optional[float]:
         return None
 
 
+def _chart_wallclock(value: Any) -> Optional[datetime]:
+    """Chart stamps carry Sri Lanka wall-clock time, labeled as if UTC.
+
+    Verified: the server emits telemetry timestamps in local (+05:30) wall
+    time with a "+00:00"/"Z" suffix (and matching epoch x values), so the
+    stamp's wall clock IS the local time. Interpret it as such.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt.replace(tzinfo=None).replace(tzinfo=SRI_LANKA)
+
+
+def _chart_epoch(value: Any) -> Optional[datetime]:
+    """Highcharts-style numeric x values are ms (µs) since epoch of the
+    local-labeled stamp; the derived wall clock is the local time."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not 1e10 <= number <= 9e18:  # plausible ms/µs since epoch
+        return None
+    if number >= 1e14:  # microseconds
+        number = number / 1e6
+    return datetime.fromtimestamp(number, tz=timezone.utc).replace(tzinfo=SRI_LANKA)
+
+
 def chart_points(payload: Any, device_key: str) -> List[Dict[str, Any]]:
     """Extract {datetime_utc/datetime_local/value} points from a chart payload.
 
@@ -373,13 +406,12 @@ def chart_points(payload: Any, device_key: str) -> List[Dict[str, Any]]:
         for item in candidate:
             if not isinstance(item, dict):
                 continue
-            dt = parse_iso(
+            dt = _chart_wallclock(
                 item.get("datetime") or item.get("date") or item.get("time")
                 or item.get("t")  # verified schema: {"x": ms, "y": val, "t": ISO}
-                or (item.get("x"))  # Highcharts point? ignored if not ISO
             )
             if dt is None:
-                dt = _numeric_datetime(item.get("x") or item.get("datetime"))
+                dt = _chart_epoch(item.get("x") or item.get("datetime"))
             value = _to_float(_first_not_none(item, "value", "level", "y"))
             if dt is not None and value is not None:
                 points.append({
@@ -390,17 +422,3 @@ def chart_points(payload: Any, device_key: str) -> List[Dict[str, Any]]:
                     "source": "chart",
                 })
     return points
-
-
-def _numeric_datetime(value: Any) -> Optional[datetime]:
-    """Highcharts-style numeric x values are ms (or µs) since epoch."""
-    try:
-        number = float(value)
-    except (TypeError, ValueError):
-        return None
-    if not 1e10 <= number <= 9e18:  # plausible ms/µs since epoch
-        return None
-    if number >= 1e14:  # microseconds
-        number = number / 1e6
-    dt = datetime.fromtimestamp(number, tz=timezone.utc)
-    return dt

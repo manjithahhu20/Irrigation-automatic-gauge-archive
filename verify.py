@@ -16,7 +16,7 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import rivernet
@@ -53,13 +53,22 @@ def probe_type(client: rivernet.Rivernet, device_type: str,
     print(f"  sample: {unit} ({sample.get('location')}) device_key={key}")
 
     from_ms = rivernet.to_millis(rivernet.floor_minutes(now - timedelta(days=range_days)))
-    to_ms = rivernet.to_millis(now)
+    # The server stores stamps in local wall-clock labeled as UTC, so its
+    # range filter compares against x values shifted +05:30; extend to_ms to
+    # include the newest ~5.5h of data.
+    to_ms = rivernet.to_millis(now + timedelta(hours=6))
     payload = client.chart(device_type, key, from_ms, to_ms)
     points = rivernet.chart_points(payload, key)
     print(f"  chart {range_days}d: points_extracted={len(points)}")
     if points:
         print(f"    first point: {points[0]}")
         print(f"    last  point: {points[-1]}")
+        last_dt = rivernet.parse_iso(points[-1]["datetime_utc"])
+        if last_dt:
+            age_min = (datetime.now(timezone.utc) - last_dt).total_seconds() / 60
+            print(f"    last point age: {age_min:.0f} min (fresh if < ~15)")
+            if age_min > 30:
+                print("  WARN: chart data appears stale")
     names = set()
     results = payload.get("results") if isinstance(payload, dict) else None
     for series in (results or {}).get("series") or []:

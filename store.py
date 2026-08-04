@@ -1,8 +1,8 @@
 """Per-station CSV storage for the RIVERNET.LK archive.
 
 Layout:
-    data/{region}/{unit_id}_{device_type}.csv        current month, plain CSV
-    archive/{YYYY-MM}/{unit_id}_{device_type}.csv.gz older months, gzipped
+    data/{region}/{station_name}_{device_type}.csv        current month, plain CSV
+    archive/{YYYY-MM}/{station_name}_{device_type}.csv.gz older months, gzipped
 """
 from __future__ import annotations
 
@@ -22,13 +22,18 @@ ARCHIVE_DIR = Path("archive")
 CSV_HEADER = ["datetime_utc", "datetime_local_530", "value", "received_at_utc", "source"]
 
 
-def _safe_name(unit_id: str, device_type: str) -> str:
-    stem = re.sub(r"[^A-Za-z0-9_.-]", "_", str(unit_id)).strip("_")
+def _safe_name(station_name: str, device_type: str) -> str:
+    stem = re.sub(r"[^A-Za-z0-9_.-]", "_", str(station_name)).strip("_. ")
     return f"{stem or 'station'}_{device_type}.csv"
 
 
-def station_path(region: str, unit_id: str, device_type: str) -> Path:
-    return DATA_DIR / _safe_region(region) / _safe_name(unit_id, device_type)
+def station_path(region: str, station_name: str, device_type: str) -> Path:
+    return DATA_DIR / _safe_region(region) / _safe_name(station_name, device_type)
+
+
+def station_label(device: Dict[str, Any]) -> str:
+    """Station name for filenames, falling back to the unit id."""
+    return device.get("location") or device.get("unitId") or device.get("deviceKey") or "station"
 
 
 def _safe_region(region: str) -> str:

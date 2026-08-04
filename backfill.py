@@ -134,7 +134,7 @@ def process_station(client: rivernet.Rivernet, state: Dict[str, Any],
             payload = client.chart(device_type, device_key, from_ms, to_ms,
                                    last_24h=last_24h)
             points = rivernet.chart_points(payload, device_key)
-            path = store.station_path(region, device.get("unitId"), device_type)
+            path = store.station_path(region, store.station_label(device), device_type)
             added = store.append_rows(path, points, device)
             entry["done"].append({"from": from_day, "to": to_day})
             stat["chunks"] += 1

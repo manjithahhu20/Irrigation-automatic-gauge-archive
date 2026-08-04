@@ -49,7 +49,7 @@ def main() -> int:
         for device in devices:
             path = store.station_path(
                 device.get("region") or "unknown",
-                device.get("unitId") or device.get("deviceKey") or "?",
+                store.station_label(device),
                 device.get("type") or device_type,
             )
             if device_type not in VALUE_TYPES:

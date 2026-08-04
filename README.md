@@ -14,22 +14,33 @@ history).
 ## Repository layout
 
 ```
-data/{region}/{unit_id}_{type}.csv        current month, plain CSV (education-friendly)
-archive/{YYYY-MM}/{unit_id}_{type}.csv.gz prior months, gzipped (keeps repo small)
-state/backfill.json                       resume state for backfill work
-state/last_collect.json                   last snapshot run metadata
-rivernet.py                               API client (snapshot + public chart history)
-collect.py                                live 5-minute snapshot collector
-backfill.py                               resumable history backfill + daily repair
-housekeep.py                              monthly archiving / integrity pass
-verify.py                                 anonymous endpoint schema check
+data/{region}/{Station Name}_{type}.csv        current month, plain CSV (education-friendly)
+archive/{YYYY-MM}/{Station Name}_{type}.csv.gz prior months, gzipped (keeps repo small)
+state/backfill.json                            resume state for backfill work
+state/last_collect.json                        last snapshot run metadata
+rivernet.py                                    API client (snapshot + public chart history)
+collect.py                                     live 5-minute snapshot collector
+backfill.py                                    resumable history backfill + daily repair
+housekeep.py                                   monthly archiving / integrity pass
+verify.py                                      anonymous endpoint schema check
 ```
 
 **CSV columns:** `datetime_utc, datetime_local_530, value, received_at_utc, source`
-Value units: river_level = metres, rain/river_rain = millimetres. Station
-metadata (coordinates, max level, alert thresholds) is stored in `#` header
-lines of each file. Rows from both sources (snapshot + chart) are merged and
-deduplicated on the minute.
+
+- `datetime_utc` is the true UTC timestamp of the reading.
+- `datetime_local_530` is the same instant in Sri Lanka local time (UTC+05:30).
+- `value` units: river_level = metres, rain/river_rain = millimetres.
+
+Station metadata (coordinates, max level, alert thresholds) is stored in `#`
+header lines of each file. Rows from both sources (snapshot + chart) are
+merged and deduplicated on the minute.
+
+> **Timestamp caveat (fixed):** the chart API stamps telemetry in Sri Lanka
+> *local* wall-clock time but labels it as UTC (`+00:00`/`Z`, epoch `x`
+> matching the local-shifted stamp). All rows written before 2026-08-04 were
+> shifted by −05:30 in a one-off migration (`migrate.py`) so `datetime_utc`
+> now holds true UTC; files carry a `# migrated:` marker in their header.
+> Snapshot rows were always correct.
 
 ## Setup
 

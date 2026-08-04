@@ -1,0 +1,11 @@
+# migrated: 2026-08-04 chart local-stamp -> true UTC (migrate.py)
+# station: Puttalam - Anuradhapura Road Mie-Oya Bridge
+# unit_id: IE8
+# device_key: 4p2fzl62po6c
+# type: river_rain   region: mi_oya
+# value unit: mm   max_level_mm: 10
+# lat: 8.049876025770994   lon: 79.91929153844978
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source
+2026-08-04T06:36:00Z,2026-08-04 12:06:00,,2026-08-04T06:36:00Z,snapshot
+2026-08-04T06:40:00Z,2026-08-04 12:10:00,,2026-08-04T06:40:00Z,snapshot
