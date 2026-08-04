@@ -1,0 +1,8 @@
+# station: Maalayarkattu Bridge
+# unit_id: IDP
+# device_key: q9noz41qfio
+# type: river_level   region: batticaloa
+# value unit: m   max_level_m: 6
+# lat: 7.434   lon: 81.69227
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source
