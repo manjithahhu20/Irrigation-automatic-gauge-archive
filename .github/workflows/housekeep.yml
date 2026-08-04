@@ -1,5 +1,6 @@
 name: housekeep
 
+# Manual run: Actions tab -> housekeep -> Run workflow (works without any inputs)
 on:
   schedule:
     - cron: "30 2 * * *"

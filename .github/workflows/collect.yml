@@ -1,5 +1,6 @@
 name: collect
 
+# Manual run: Actions tab -> collect -> Run workflow (works without any inputs)
 on:
   schedule:
     - cron: "*/5 * * * *"

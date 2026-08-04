@@ -1,5 +1,6 @@
 name: backfill
 
+# Manual run: Actions tab -> backfill -> Run workflow (optional from/to date inputs)
 on:
   workflow_dispatch:
     inputs:
