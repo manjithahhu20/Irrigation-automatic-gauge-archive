@@ -1,0 +1,2 @@
+# No third-party dependencies required: the archive uses the Python standard
+# library (urllib, json, csv, gzip). Python 3.9+ is sufficient.

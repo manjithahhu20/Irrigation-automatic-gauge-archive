@@ -1,0 +1,8 @@
+# station: Ilukwewa Anicut
+# unit_id: IB5
+# device_key: g439qrwbsog
+# type: river_rain   region: yan_oya
+# value unit: mm   max_level_mm: 10
+# lat: 8.332447580348553   lon: 80.73399317013396
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source

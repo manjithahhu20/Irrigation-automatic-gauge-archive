@@ -1,0 +1,46 @@
+name: collect
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rivernet-collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run snapshot collection
+        env:
+          RIVERNET_USERNAME: ${{ secrets.RIVERNET_USERNAME }}
+          RIVERNET_PASSWORD: ${{ secrets.RIVERNET_PASSWORD }}
+        run: python collect.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "rivernet-archive[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data archive state
+          if ! git diff --cached --quiet; then
+            git commit -m "collect: snapshot $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          else
+            echo "no new data rows"
+          fi

@@ -1,0 +1,11 @@
+# station: Vadamunai Unit Office
+# unit_id: IDJ
+# device_key: 47sh5lyygdk4
+# type: rain   region: batticaloa
+# value unit: mm   max_level_mm: 
+# lat: 7.92291   lon: 81.25667
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source
+2026-08-04T06:37:00Z,2026-08-04 12:07:00,,2026-08-04T06:37:00Z,snapshot
+2026-08-04T06:40:00Z,2026-08-04 12:10:00,,2026-08-04T06:40:00Z,snapshot
+2026-08-04T08:55:00Z,2026-08-04 14:25:00,,2026-08-04T08:55:00Z,snapshot

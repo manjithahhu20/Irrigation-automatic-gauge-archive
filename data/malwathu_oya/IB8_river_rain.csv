@@ -1,0 +1,8 @@
+# station: Akathimurippu Inlet Canal
+# unit_id: IB8
+# device_key: 4ffolqpqp7uo
+# type: river_rain   region: malwathu_oya
+# value unit: mm   max_level_mm: 10
+# lat: 8.767513828046779   lon: 79.9837195900433
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source

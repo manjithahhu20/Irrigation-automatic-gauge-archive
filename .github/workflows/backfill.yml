@@ -1,0 +1,70 @@
+name: backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "Start date YYYY-MM-DD (empty = earliest station record)"
+        default: ""
+      to:
+        description: "End date YYYY-MM-DD inclusive (empty = today)"
+        default: ""
+  schedule:
+    - cron: "15 1 * * *"
+    - cron: "15 13 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rivernet-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Determine range
+        id: range
+        shell: bash
+        run: |
+          FROM="${{ github.event.inputs.from }}"
+          TO="${{ github.event.inputs.to }}"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            FROM="$(date -u -d '-3 days' +%F)"
+            TO="$(date -u +%F)"
+          fi
+          echo "from=$FROM" >> "$GITHUB_OUTPUT"
+          echo "to=$TO" >> "$GITHUB_OUTPUT"
+
+      - name: Run backfill
+        run: |
+          FROM="${{ steps.range.outputs.from }}"
+          TO="${{ steps.range.outputs.to }}"
+          ARGS=""
+          if [ -n "$FROM" ]; then ARGS="$ARGS --from $FROM"; fi
+          if [ -n "$TO" ]; then ARGS="$ARGS --to $TO"; fi
+          python backfill.py $ARGS
+
+      - name: Commit and push
+        run: |
+          git config user.name "rivernet-archive[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data archive state
+          if ! git diff --cached --quiet; then
+            git commit -m "backfill: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push
+          else
+            echo "nothing new to commit"
+          fi
