@@ -26,7 +26,9 @@ Use cases:
 
 Progress is tracked in state/backfill.json so interrupted runs resume. Ranges
 are processed as sub-chunks (default 30 days; the 5-minute series tolerates
-much larger windows). Requests are throttled to ~1/sec per the site's
+much larger windows). The recent 1-minute chunk is never recorded as done, so
+every run (scheduled or manual) re-pulls it and advances the CSVs to the
+latest chart minute. Requests are throttled to ~1/sec per the site's
 robots.txt Crawl-delay.
 """
 from __future__ import annotations
@@ -81,9 +83,11 @@ def build_chunks(from_dt: datetime, to_dt: datetime, days: int,
     Historical chunks (last24HoursData=0, 5-minute points) are only useful for
     river_level / river_rain — the server retains no rain history. A final
     chunk spanning the last ~3 days uses last24HoursData=1 (1-minute points);
-    the server keeps only ~2.4 days of 1-minute data, so this window must be
-    re-pulled at least daily to preserve it. recent_only=True (rain stations)
-    fetches just that window.
+    the server keeps only ~2.4 days of 1-minute data, so this window is
+    re-pulled on EVERY run (it is never recorded as "done" — see
+    process_station), which is what keeps both scheduled runs and any manual
+    run advancing the CSVs to the latest minute. recent_only=True (rain
+    stations) fetches just that window.
     """
     recent_start = rivernet.floor_minutes(today - timedelta(days=RECENT_DAYS))
     chunks: List[Tuple[str, str, bool]] = []
@@ -131,7 +135,7 @@ def process_station(client: rivernet.Rivernet, state: Dict[str, Any],
     stat = {"chunks": 0, "rows": 0, "failed": 0}
 
     for from_day, to_day, last_24h in chunks:
-        if {"from": from_day, "to": to_day} in entry["done"]:
+        if not last_24h and {"from": from_day, "to": to_day} in entry["done"]:
             continue
         from_ms = rivernet.to_millis(rivernet.floor_minutes(parse_date(from_day)))
         to_ms = rivernet.to_millis(parse_date(to_day) + timedelta(days=1))
@@ -141,7 +145,8 @@ def process_station(client: rivernet.Rivernet, state: Dict[str, Any],
             points = rivernet.chart_points(payload, device_key)
             path = store.station_path(region, store.station_label(device), device_type)
             added = store.append_rows(path, points, device)
-            entry["done"].append({"from": from_day, "to": to_day})
+            if not last_24h:
+                entry["done"].append({"from": from_day, "to": to_day})
             stat["chunks"] += 1
             stat["rows"] += added
             print(f"  {unit} {from_day}:{to_day} last24h={int(last_24h)} "
