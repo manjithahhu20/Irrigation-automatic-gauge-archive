@@ -1,17 +1,22 @@
-"""backfill.py - resumable history backfill for the RIVERNET.LK archive.
+"""backfill.py - the single chart-only collector for the RIVERNET.LK archive.
 
 Pulls station history from the public chart endpoint (no auth required):
     /api/reports/{river-level|rainfall}/chart/minute/{from_ms}/{to_ms}
     ?keys={device_key}&last24HoursData={0|1}&isPublic=1&isPublicHistory=1
-and merges it into the same per-station CSVs used by collect.py.
+and merges it into the same per-station CSVs. This is the ONLY data source:
+there is no snapshot collector any more.
 
 Server retention rules (verified empirically):
-  * last24HoursData=1 -> ~1-minute points, but only ~2.4 days are retained,
-    so the final chunk re-pulls the last 3 days on every run.
+  * last24HoursData=1 -> ~1-minute points, retained ~2 days, so the final
+    chunk re-pulls the last 3 days on every run. Two daily runs preserve
+    every minute of every station.
   * last24HoursData=0 -> 5-minute points, full history, for river_level and
-    river_rain only; the server retains NO rain history (rain stations get
-    only the 1-minute recent chunk; the 5-minute snapshot collector in
-    collect.py is what builds the rain record over time).
+    river_rain only; the server retains NO rain history. Rain stations are
+    covered by the 1-minute recent chunk alone: repeated twice-daily pulls
+    accumulate the full rain record in the archive.
+
+The station list + metadata (names, regions, coordinates) come from the
+snapshot endpoint (all_latest); VALUES are taken entirely from the chart.
 
 Use cases:
   * first run:     python backfill.py                         (auto-detect per

@@ -7,4 +7,3 @@
 # lat: 8.219384762039134   lon: 80.71280432218822
 # source: rivernet.lk flood early-warning API (site-owner permission granted)
 datetime_utc,datetime_local_530,value,received_at_utc,source
-2026-08-04T06:32:00Z,2026-08-04 12:02:00,,2026-08-04T06:32:00Z,snapshot

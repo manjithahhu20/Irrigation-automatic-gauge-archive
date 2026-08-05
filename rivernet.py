@@ -293,36 +293,6 @@ class Rivernet:
 
 # -- row extraction -------------------------------------------------------------
 
-def snapshot_row(device: dict) -> Optional[Dict[str, Any]]:
-    """Normalise one latest-status-paginated device into an archive row."""
-    latest = device.get("latest")
-    if not latest:
-        return None
-    rainy = device.get("additional") or {}
-    value_dt = parse_iso(latest.get("datetime") or latest.get("time"))
-    received_dt = parse_iso(
-        (latest.get("latestRecord") or {}).get("received_at")
-    ) or value_dt
-    if value_dt is None:
-        return None
-    return {
-        "unit_id": device.get("unitId") or device.get("deviceKey") or "?",
-        "device_key": device.get("deviceKey") or "",
-        "type": device.get("type") or "",
-        "region": device.get("region") or "",
-        "location": device.get("location") or latest.get("name") or "",
-        "lat": (rainy.get("coordinates") or {}).get("latitude"),
-        "lon": (rainy.get("coordinates") or {}).get("longitude"),
-        "max_level": rainy.get("maxLevel"),
-        "alert_type": latest.get("alertType") or "",
-        "value": _to_float(latest.get("latestLevel")),
-        "datetime_utc": iso_utc(value_dt),
-        "datetime_local_530": iso_local(value_dt),
-        "received_at_utc": iso_utc(received_dt),
-        "source": "snapshot",
-    }
-
-
 def _first_not_none(item: dict, *keys: str) -> Any:
     """First key present with a non-None value (0 is a valid value)."""
     for key in keys:

@@ -2,10 +2,10 @@
 
 Automated, educational archive of real-time river levels, rainfall and
 river-rain gauge readings from Sri Lanka's **RIVERNET.LK** flood early-warning
-system (<https://rivernet.lk>). GitHub Actions polls the **public** API and
-commits the data as per-station CSV files: live 5-minute snapshots plus a
-full-history backfill (1-minute resolution for recent days, 5-minute for
-history).
+system (<https://rivernet.lk>). GitHub Actions polls the **public** chart API
+and commits the data as per-station CSV files: 1-minute resolution for recent
+days, 5-minute for full history. Two runs a day keep the ephemeral 1-minute
+data captured (the server retains it for ~2 days).
 
 > **Permission:** the RIVERNET.LK site owner has granted permission for this
 > archive. `robots.txt` explicitly allows bots and LLM agents
@@ -17,10 +17,8 @@ history).
 data/{region}/{Station Name}_{type}.csv        current month, plain CSV (education-friendly)
 archive/{YYYY-MM}/{Station Name}_{type}.csv.gz prior months, gzipped (keeps repo small)
 state/backfill.json                            resume state for backfill work
-state/last_collect.json                        last snapshot run metadata
-rivernet.py                                    API client (snapshot + public chart history)
-collect.py                                     live 5-minute snapshot collector
-backfill.py                                    resumable history backfill + daily repair
+rivernet.py                                    API client (public chart history + station list)
+backfill.py                                    chart-only collector: history + 2x-daily repair
 housekeep.py                                   monthly archiving / integrity pass
 verify.py                                      anonymous endpoint schema check
 ```
@@ -32,20 +30,19 @@ verify.py                                      anonymous endpoint schema check
 - `value` units: river_level = metres, rain/river_rain = millimetres.
 
 Station metadata (coordinates, max level, alert thresholds) is stored in `#`
-header lines of each file. Rows from both sources (snapshot + chart) are
-merged and deduplicated on the minute.
+header lines of each file. Every row comes from the chart API (`source=chart`).
+The snapshot endpoint is used only to list stations and refresh metadata.
 
 > **Timestamp caveat (fixed):** the chart API stamps telemetry in Sri Lanka
 > *local* wall-clock time but labels it as UTC (`+00:00`/`Z`, epoch `x`
 > matching the local-shifted stamp). All rows written before 2026-08-04 were
 > shifted by −05:30 in a one-off migration (`migrate.py`) so `datetime_utc`
 > now holds true UTC; files carry a `# migrated:` marker in their header.
-> Snapshot rows were always correct.
 
 ## Setup
 
 1. Fork / create a repo from this directory and enable Actions.
-2. Push. The `collect` workflow starts automatically.
+2. Push. The `backfill` workflow starts collecting (twice daily).
 3. **No credentials or Secrets are required** — every endpoint used by this
    archive is public.
 
@@ -53,28 +50,27 @@ merged and deduplicated on the minute.
 
 | Workflow    | Trigger                        | Action |
 |-------------|--------------------------------|--------|
-| `collect`   | `*/5` min cron + manual        | live snapshot → rain-only value rows (long-term rainfall record), metadata refresh for all stations |
-| `backfill`  | `workflow_dispatch` + daily 01:15 & 13:15 UTC | one-time full history (river stations only, 5-min), then 3-day gap repair incl. 1-minute recent data |
+| `backfill`  | `workflow_dispatch` (manual, optional from/to dates) + daily 01:15 & 13:15 UTC | 5-minute full history in 30-day chunks (river stations), plus the rolling 3-day 1-minute window for every station |
 | `housekeep` | daily 02:30 UTC                | zips prior months to `archive/`, dedups, prunes empties |
 
 ## Data retention rules (verified empirically)
 
-The chart API serves three flavours of data, with different retention:
+The chart API serves two flavours of data, with different retention:
 
 | Series | How to request | Retention |
 |--------|----------------|-----------|
-| 1-minute | `last24HoursData=1` | **~2.4 days only** — re-pulled every run by the backfill's 3-day "recent" chunk |
+| 1-minute | `last24HoursData=1` | **~2 days only** — the rolling 3-day "recent" chunk re-pulls it every run |
 | 5-minute | `last24HoursData=0` | **full history** (verified to 120+ days) for river_level and river_rain |
-| rain | either | **no history at all** — only ~2.4 days of 1-minute data exists server-side |
+
+Rain stations have **no 5-minute history** server-side — their record is built
+entirely from the repeated 1-minute pulls, which accumulate into a permanent
+1-minute rainfall series in the archive.
 
 Consequences for the archive:
-- `backfill.py` pulls 5-minute history in 30-day chunks for river stations
-  only, plus the rolling 3-day 1-minute window for every station.
-- `collect.py` writes snapshot value rows **only for rain stations** — they are
-  the only long-term rainfall record. river_level / river_rain snapshot values
-  are skipped (identical to the chart's 5-minute series).
 - The daily backfill runs twice (01:15 / 13:15 UTC) so a delayed Actions run
-  cannot lose the ephemeral 1-minute data.
+  cannot lose the ephemeral 1-minute data (retention ~2 days).
+- Every minute of every station is captured; recent rows are 1-minute, older
+  river rows are 5-minute.
 
 ## Caveats
 
