@@ -8,8 +8,10 @@ there is no snapshot collector any more.
 
 Server retention rules (verified empirically):
   * last24HoursData=1 -> ~1-minute points, retained ~2 days, so the final
-    chunk re-pulls the last 3 days on every run. Two daily runs preserve
-    every minute of every station.
+    chunk re-pulls the last 3 days on every run. The server truncates wide
+    windows at a daily batch boundary (only narrow windows return the live
+    tail), so the recent chunk also re-pulls a narrow 24h window. Two daily
+    runs preserve every minute of every station.
   * last24HoursData=0 -> 5-minute points, full history, for river_level and
     river_rain only; the server retains NO rain history. Rain stations are
     covered by the 1-minute recent chunk alone: repeated twice-daily pulls
@@ -145,6 +147,18 @@ def process_station(client: rivernet.Rivernet, state: Dict[str, Any],
             points = rivernet.chart_points(payload, device_key)
             path = store.station_path(region, store.station_label(device), device_type)
             added = store.append_rows(path, points, device)
+            if last_24h:
+                # The server truncates wide windows at a daily batch boundary
+                # (verified 2026-08-05: a 3-4 day request ends at 13:00Z while
+                # live minutes are only served for narrow windows). Re-pull the
+                # last 24h as a narrow window so every run captures the tail.
+                now = rivernet.floor_minutes(rivernet.now_local())
+                narrow_from = rivernet.to_millis(now - timedelta(hours=24))
+                narrow_to = rivernet.to_millis(now + timedelta(hours=6))
+                payload = client.chart(device_type, device_key,
+                                       narrow_from, narrow_to, last_24h=True)
+                points = rivernet.chart_points(payload, device_key)
+                added += store.append_rows(path, points, device)
             if not last_24h:
                 entry["done"].append({"from": from_day, "to": to_day})
             stat["chunks"] += 1
