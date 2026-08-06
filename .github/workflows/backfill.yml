@@ -1,6 +1,6 @@
 name: backfill
 
-# Manual run: Actions tab -> backfill -> Run workflow (optional from/to date inputs)
+# Run: cron-job.org daily at 01:15 / 13:15 UTC, or manual from the Actions tab (optional from/to inputs)
 on:
   workflow_dispatch:
     inputs:
@@ -10,9 +10,6 @@ on:
       to:
         description: "End date YYYY-MM-DD inclusive (empty = today)"
         default: ""
-  schedule:
-    - cron: "15 1 * * *"
-    - cron: "15 13 * * *"
 
 permissions:
   contents: write
@@ -42,10 +39,6 @@ jobs:
         run: |
           FROM="${{ github.event.inputs.from }}"
           TO="${{ github.event.inputs.to }}"
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            FROM="$(date -u -d '-3 days' +%F)"
-            TO="$(date -u +%F)"
-          fi
           echo "from=$FROM" >> "$GITHUB_OUTPUT"
           echo "to=$TO" >> "$GITHUB_OUTPUT"
 

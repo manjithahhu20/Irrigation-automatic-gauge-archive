@@ -1,9 +1,7 @@
 name: housekeep
 
-# Manual run: Actions tab -> housekeep -> Run workflow (works without any inputs)
+# Run: cron-job.org daily at 02:30 UTC, or manual from the Actions tab
 on:
-  schedule:
-    - cron: "30 2 * * *"
   workflow_dispatch:
 
 permissions:
