@@ -11,7 +11,7 @@ data captured (the server retains it for ~2 days).
 > archive. `robots.txt` explicitly allows bots and LLM agents
 > (`Crawl-delay: 1`, which this project honours by throttling to ~1 req/sec).
 
-## Repository layout
+## Repository layout 
 
 ```
 data/{region}/{Station Name}_{type}.csv        current month, plain CSV (education-friendly)
