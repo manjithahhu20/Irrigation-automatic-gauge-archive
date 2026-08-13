@@ -1,0 +1,8 @@
+# station: Hurulu Wewa Spill Canal - Girigori's Bridge
+# unit_id: IB6
+# device_key: 4708j8ynvpk4
+# type: river_rain   region: yan_oya
+# value unit: mm   max_level_mm: 10
+# lat: 8.219384762039134   lon: 80.71280432218822
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source
