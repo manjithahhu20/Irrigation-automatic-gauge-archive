@@ -1,0 +1,8 @@
+# station: Kaddumurivu
+# unit_id: IFO
+# device_key: c564rtzyyko
+# type: river_level   region: mahakarachchi
+# value unit: m   max_level_m: 6
+# lat: 0   lon: 0
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source
