@@ -1,0 +1,8 @@
+# station: Kiwulegama
+# unit_id: IEN
+# device_key: 3wfdz1nwibeo
+# type: rain   region: galoya
+# value unit: mm   max_level_mm: 6
+# lat: 0   lon: 0
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source
