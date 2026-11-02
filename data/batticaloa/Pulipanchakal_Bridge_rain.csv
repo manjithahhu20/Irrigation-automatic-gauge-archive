@@ -1,0 +1,8 @@
+# station: Pulipanchakal Bridge
+# unit_id: IDM
+# device_key: 6iu3y061mm4g
+# type: rain   region: batticaloa
+# value unit: mm   max_level_mm: 
+# lat: 7.8616   lon: 81.50703
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source
