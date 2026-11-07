@@ -9,13 +9,15 @@ from __future__ import annotations
 import csv
 import gzip
 import heapq
+import io
 import os
 import re
 import shutil
 import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, Iterator, List, Optional, TextIO
 
 DATA_DIR = Path("data")
 ARCHIVE_DIR = Path("archive")
@@ -92,9 +94,26 @@ def _atomic_replace(src: str, dst: str) -> None:
             os.replace(src, dst)
             return
         except PermissionError:
+            if attempt == 0 and Path(dst).exists():
+                _replace_with_backup(Path(src), Path(dst))
+                return
             if attempt == 4:
                 raise
             time.sleep(1 + attempt)
+
+
+def _replace_with_backup(src: Path, dst: Path) -> None:
+    """Fallback for Windows filesystems that reject replacing a target directly."""
+    backup = dst.with_suffix(dst.suffix + ".bak")
+    backup.unlink(missing_ok=True)
+    os.replace(dst, backup)
+    try:
+        os.replace(src, dst)
+    except Exception:
+        os.replace(backup, dst)
+        raise
+    else:
+        backup.unlink(missing_ok=True)
 
 
 def _write_rows(path: Path, header: List[str], rows: Iterable[Dict[str, str]]) -> None:
@@ -173,13 +192,25 @@ def gzip_csv(path: Path) -> Path:
 
 def _write_gz(target: Path, comments: List[str], rows: List[Dict[str, str]]) -> None:
     tmp = target.with_suffix(target.suffix + ".tmp")
-    with gzip.open(tmp, "wt", encoding="utf-8", newline="") as handle:
+    with gzip_text_writer(tmp) as handle:
         for line in comments:
             handle.write(line + "\n")
         writer = csv.DictWriter(handle, fieldnames=CSV_HEADER, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
     _atomic_replace(str(tmp), str(target))
+
+
+@contextmanager
+def gzip_text_writer(path: Path) -> Iterator[TextIO]:
+    """Open a gzip text stream without embedding the temporary filename."""
+    with path.open("wb") as raw:
+        compressed = gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0)
+        text = io.TextIOWrapper(compressed, encoding="utf-8", newline="")
+        try:
+            yield text
+        finally:
+            text.close()
 
 
 def read_gz_rows(path: Path) -> List[Dict[str, str]]:
@@ -205,6 +236,27 @@ def _gz_comments(path: Path) -> List[str]:
         return [line.rstrip("\n") for line in handle if line.startswith("#")]
 
 
+def _embedded_gzip_name(path: Path) -> str:
+    """Return the original filename stored in a gzip header, if present."""
+    with path.open("rb") as handle:
+        header = handle.read(4096)
+    if len(header) < 10 or header[:2] != b"\x1f\x8b":
+        return ""
+    flags = header[3]
+    offset = 10
+    if flags & 0x04:
+        if len(header) < offset + 2:
+            return ""
+        extra_length = int.from_bytes(header[offset:offset + 2], "little")
+        offset += 2 + extra_length
+    if not flags & 0x08:
+        return ""
+    end = header.find(b"\x00", offset)
+    if end < 0:
+        return ""
+    return header[offset:end].decode("latin-1")
+
+
 def _write_unique_gz(
     target: Path,
     comments: List[str],
@@ -217,7 +269,7 @@ def _write_unique_gz(
     count = 0
     first = ""
     last = ""
-    with gzip.open(tmp, "wt", encoding="utf-8", newline="") as handle:
+    with gzip_text_writer(tmp) as handle:
         for line in comments:
             handle.write(line + "\n")
         writer = csv.DictWriter(handle, fieldnames=CSV_HEADER, extrasaction="ignore")
@@ -234,6 +286,21 @@ def _write_unique_gz(
             count += 1
     _atomic_replace(str(tmp), str(target))
     return count, first, last
+
+
+def repair_gzip_headers() -> int:
+    """Rewrite gzip files that embed a temporary filename in their header."""
+    repaired = 0
+    if not ARCHIVE_DIR.exists():
+        return repaired
+    for path in sorted(ARCHIVE_DIR.glob("*.csv.gz")):
+        embedded = _embedded_gzip_name(path)
+        if not embedded.endswith(".tmp"):
+            continue
+        comments = _gz_comments(path)
+        _write_unique_gz(path, comments, _iter_gz_rows(path))
+        repaired += 1
+    return repaired
 
 
 def consolidate_monthly_archives() -> tuple[int, int]:

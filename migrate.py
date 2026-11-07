@@ -100,7 +100,7 @@ def _write_plain(path: Path, comments: List[str], rows: List[Dict[str, str]]) ->
 
 def _write_gz(path: Path, comments: List[str], rows: List[Dict[str, str]]) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    with gzip.open(tmp, "wt", encoding="utf-8", newline="") as handle:
+    with store.gzip_text_writer(tmp) as handle:
         for line in comments:
             handle.write(line + "\n")
         writer = csv.DictWriter(handle, fieldnames=store.CSV_HEADER, extrasaction="ignore")

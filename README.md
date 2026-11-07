@@ -37,6 +37,10 @@ Each file in `archive/` contains the complete archived history for one gauge,
 not one file per month. Rows are sorted by `datetime_utc` and deduplicated by
 UTC minute.
 
+The gzip files do not embed a temporary filename. Extracting
+`{Station Name}_{type}.csv.gz` produces a normal `.csv` file that can be
+opened by Excel, LibreOffice, Python, or another CSV reader.
+
 > **Timestamp caveat (fixed):** the chart API stamps telemetry in Sri Lanka
 > *local* wall-clock time but labels it as UTC (`+00:00`/`Z`, epoch `x`
 > matching the local-shifted stamp). All rows written before 2026-08-04 were

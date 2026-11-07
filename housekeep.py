@@ -3,8 +3,9 @@
 1. Splits every station CSV in data/: current-month rows stay plain in data/,
    all older months are merged (deduped) into archive/...csv.gz.
 2. Migrates legacy archive/{YYYY-MM}/ folders into one file per gauge.
-3. Compresses any stray plain .csv left in archive/ from earlier runs.
-4. Prunes empty directories under data/ and archive/.
+3. Repairs legacy gzip headers that embedded temporary .tmp filenames.
+4. Compresses any stray plain .csv left in archive/ from earlier runs.
+5. Prunes empty directories under data/ and archive/.
 
 Run daily in a workflow. Designed to keep the git repo small: only the current
 month lives as plain (education-friendly) CSVs; each gauge's history lives in
@@ -51,6 +52,7 @@ def prune_empty_dirs(root: Path) -> None:
 
 def main() -> int:
     consolidated, migrated_files = store.consolidate_monthly_archives()
+    repaired_headers = store.repair_gzip_headers()
     archived = split_finished_files()
     compressed = compress_loose_archives()
     if store.DATA_DIR.exists():
@@ -60,6 +62,7 @@ def main() -> int:
     print(
         f"TOTAL consolidated_gauges={consolidated} "
         f"migrated_monthly_files={migrated_files} "
+        f"repaired_gzip_headers={repaired_headers} "
         f"archived_months={archived} compressed={compressed}"
     )
     return 0
