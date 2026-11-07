@@ -15,7 +15,7 @@ data captured (the server retains it for ~2 days).
 
 ```
 data/{region}/{Station Name}_{type}.csv        current month, plain CSV (education-friendly)
-archive/{YYYY-MM}/{Station Name}_{type}.csv.gz prior months, gzipped (keeps repo small)
+archive/{Station Name}_{type}.csv.gz            one continuous gzipped file per gauge
 state/backfill.json                            resume state for backfill work
 rivernet.py                                    API client (public chart history + station list)
 backfill.py                                    chart-only collector: history + 2x-daily repair
@@ -32,6 +32,10 @@ verify.py                                      anonymous endpoint schema check
 Station metadata (coordinates, max level, alert thresholds) is stored in `#`
 header lines of each file. Every row comes from the chart API (`source=chart`).
 The snapshot endpoint is used only to list stations and refresh metadata.
+
+Each file in `archive/` contains the complete archived history for one gauge,
+not one file per month. Rows are sorted by `datetime_utc` and deduplicated by
+UTC minute.
 
 > **Timestamp caveat (fixed):** the chart API stamps telemetry in Sri Lanka
 > *local* wall-clock time but labels it as UTC (`+00:00`/`Z`, epoch `x`
@@ -51,7 +55,7 @@ The snapshot endpoint is used only to list stations and refresh metadata.
 | Workflow    | Trigger                        | Action |
 |-------------|--------------------------------|--------|
 | `backfill`  | `workflow_dispatch` (manual, optional from/to dates) + daily 01:15 & 13:15 UTC | 5-minute full history in 30-day chunks (river stations), plus the rolling 3-day 1-minute window for every station |
-| `housekeep` | daily 02:30 UTC                | zips prior months to `archive/`, dedups, prunes empties |
+| `housekeep` | daily 02:30 UTC                | merges prior months into one gzipped file per gauge, dedups, prunes empties |
 
 ## Data retention rules (verified empirically)
 

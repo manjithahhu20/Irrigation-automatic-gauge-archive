@@ -1,12 +1,14 @@
 """housekeep.py - monthly archiving and integrity pass.
 
 1. Splits every station CSV in data/: current-month rows stay plain in data/,
-   all older months are merged (deduped) into archive/{YYYY-MM}/...csv.gz.
-2. Compresses any stray plain .csv left in archive/ from earlier runs.
-3. Prunes empty region directories under data/.
+   all older months are merged (deduped) into archive/...csv.gz.
+2. Migrates legacy archive/{YYYY-MM}/ folders into one file per gauge.
+3. Compresses any stray plain .csv left in archive/ from earlier runs.
+4. Prunes empty directories under data/ and archive/.
 
 Run daily in a workflow. Designed to keep the git repo small: only the current
-month lives as plain (education-friendly) CSVs; everything older is gzipped.
+month lives as plain (education-friendly) CSVs; each gauge's history lives in
+one gzipped archive file.
 """
 from __future__ import annotations
 
@@ -48,11 +50,18 @@ def prune_empty_dirs(root: Path) -> None:
 
 
 def main() -> int:
+    consolidated, migrated_files = store.consolidate_monthly_archives()
     archived = split_finished_files()
     compressed = compress_loose_archives()
     if store.DATA_DIR.exists():
         prune_empty_dirs(store.DATA_DIR)
-    print(f"TOTAL archived_months={archived} compressed={compressed}")
+    if store.ARCHIVE_DIR.exists():
+        prune_empty_dirs(store.ARCHIVE_DIR)
+    print(
+        f"TOTAL consolidated_gauges={consolidated} "
+        f"migrated_monthly_files={migrated_files} "
+        f"archived_months={archived} compressed={compressed}"
+    )
     return 0
 
 

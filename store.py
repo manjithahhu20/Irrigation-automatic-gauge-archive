@@ -2,12 +2,13 @@
 
 Layout:
     data/{region}/{station_name}_{device_type}.csv        current month, plain CSV
-    archive/{YYYY-MM}/{station_name}_{device_type}.csv.gz older months, gzipped
+    archive/{station_name}_{device_type}.csv.gz           all archived months, gzipped
 """
 from __future__ import annotations
 
 import csv
 import gzip
+import heapq
 import os
 import re
 import shutil
@@ -154,18 +155,19 @@ def last_datetime(path: Path) -> Optional[str]:
 
 
 def gzip_csv(path: Path) -> Path:
-    """Compress a plain CSV into archive/{YYYY-MM}/...csv.gz with dedup+sort.
+    """Compress a plain CSV into the gauge's consolidated archive file.
 
-    The last-row date decides the target month folder.
+    Existing rows in the archive are retained, and new rows are deduped/sorted.
     """
     rows = _read_rows(path)
     rows.sort(key=lambda r: r["datetime_utc"])
     header = _read_header(path)
-    month = _month_of(rows[-1]["datetime_utc"]) if rows else datetime.now().strftime("%Y-%m")
-    target_dir = ARCHIVE_DIR / month
-    target_dir.mkdir(parents=True, exist_ok=True)
-    target = target_dir / (path.stem + ".csv.gz")
-    _write_gz(target, header, rows)
+    target = ARCHIVE_DIR / (path.stem + ".csv.gz")
+    if rows:
+        merge_gz(target, header, rows)
+    elif not target.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _write_gz(target, header, [])
     return target
 
 
@@ -182,13 +184,91 @@ def _write_gz(target: Path, comments: List[str], rows: List[Dict[str, str]]) -> 
 
 def read_gz_rows(path: Path) -> List[Dict[str, str]]:
     """Read data rows from an existing archive .csv.gz (skips comments/header)."""
+    return list(_iter_gz_rows(path))
+
+
+def _iter_gz_rows(path: Path) -> Iterable[Dict[str, str]]:
+    """Yield data rows from a gzipped station CSV."""
     with gzip.open(path, "rt", encoding="utf-8") as handle:
         reader = csv.DictReader(
             (row for row in handle
              if not row.startswith("#") and not row.startswith("datetime_utc,") and row.strip()),
             fieldnames=CSV_HEADER,
         )
-        return [row for row in reader if row.get("datetime_utc")]
+        for row in reader:
+            if row.get("datetime_utc"):
+                yield {key: row.get(key) or "" for key in CSV_HEADER}
+
+
+def _gz_comments(path: Path) -> List[str]:
+    with gzip.open(path, "rt", encoding="utf-8") as handle:
+        return [line.rstrip("\n") for line in handle if line.startswith("#")]
+
+
+def _write_unique_gz(
+    target: Path,
+    comments: List[str],
+    rows: Iterable[Dict[str, str]],
+) -> tuple[int, str, str]:
+    """Write sorted rows, keeping the first row for each UTC minute."""
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    seen: set[str] = set()
+    count = 0
+    first = ""
+    last = ""
+    with gzip.open(tmp, "wt", encoding="utf-8", newline="") as handle:
+        for line in comments:
+            handle.write(line + "\n")
+        writer = csv.DictWriter(handle, fieldnames=CSV_HEADER, extrasaction="ignore")
+        writer.writeheader()
+        for row in rows:
+            datetime_utc = row.get("datetime_utc") or ""
+            key = _minute_key(datetime_utc)
+            if not datetime_utc or key in seen:
+                continue
+            seen.add(key)
+            writer.writerow({field: row.get(field) or "" for field in CSV_HEADER})
+            first = first or datetime_utc
+            last = datetime_utc
+            count += 1
+    _atomic_replace(str(tmp), str(target))
+    return count, first, last
+
+
+def consolidate_monthly_archives() -> tuple[int, int]:
+    """Merge legacy archive/{YYYY-MM}/ files into one archive file per gauge.
+
+    Source files are deleted only after their consolidated target is written
+    successfully. Re-running is safe and only processes remaining month folders.
+    """
+    if not ARCHIVE_DIR.exists():
+        return 0, 0
+    groups: Dict[str, List[Path]] = {}
+    for path in ARCHIVE_DIR.glob("*/*.csv.gz"):
+        groups.setdefault(path.name, []).append(path)
+
+    consolidated = 0
+    removed = 0
+    for filename, legacy_paths in sorted(groups.items()):
+        target = ARCHIVE_DIR / filename
+        legacy_paths.sort(key=lambda path: path.parent.name, reverse=True)
+        sources = ([target] if target.exists() else []) + legacy_paths
+        comments = _gz_comments(sources[0])
+        rows = heapq.merge(
+            *(_iter_gz_rows(path) for path in sources),
+            key=lambda row: row["datetime_utc"],
+        )
+        count, first, last = _write_unique_gz(target, comments, rows)
+        for path in legacy_paths:
+            path.unlink()
+            removed += 1
+        consolidated += 1
+        print(
+            f"consolidated {filename}: rows={count} "
+            f"from_monthly={len(legacy_paths)} range={first or '-'}..{last or '-'}"
+        )
+    return consolidated, removed
 
 
 def merge_gz(target: Path, comments: List[str], rows: List[Dict[str, str]]) -> int:
@@ -212,10 +292,10 @@ def merge_gz(target: Path, comments: List[str], rows: List[Dict[str, str]]) -> i
 
 
 def split_and_archive(path: Path) -> int:
-    """Move non-current-month rows from a plain station CSV into archive gzips.
+    """Move non-current-month rows from a plain station CSV into its archive file.
 
     Rows are grouped by month: the current month stays in data/ as plain CSV,
-    every older month is merged (deduped) into archive/{YYYY-MM}/{stem}.csv.gz.
+    every older month is merged (deduped) into archive/{stem}.csv.gz.
     Returns the number of months archived. Files with no current-month rows are
     removed from data/ after archiving; empty files are left untouched.
     """
@@ -231,7 +311,7 @@ def split_and_archive(path: Path) -> int:
     for month, month_rows in by_month.items():
         if month == current:
             continue
-        target = ARCHIVE_DIR / month / (path.stem + ".csv.gz")
+        target = ARCHIVE_DIR / (path.stem + ".csv.gz")
         merge_gz(target, comments, month_rows)
         archived += 1
     current_rows = by_month.get(current, [])
