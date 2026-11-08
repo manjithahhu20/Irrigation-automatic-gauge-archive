@@ -1,0 +1,8 @@
+# station: Medawala - Siyabaladamana Bridge
+# unit_id: IB2
+# device_key: 66ismfi8w084
+# type: river_rain   region: malwathu_oya
+# value unit: mm   max_level_mm: 10
+# lat: 8.068233147111286   lon: 80.6957816342722
+# source: rivernet.lk flood early-warning API (site-owner permission granted)
+datetime_utc,datetime_local_530,value,received_at_utc,source
